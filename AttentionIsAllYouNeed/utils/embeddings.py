@@ -3,51 +3,61 @@ import torch.nn as nn
 
 class InputEmbeddings(nn.Module):
     """
-    A PyTorch module that performs input embeddings for a sequence model.
+    Embeds input tokens into dense vectors for use in a Transformer model, scaling the embeddings
+    by the square root of the model dimension.
 
-    This module maps input tokens (usually indices) to dense vectors of a specified dimension.
-    The embeddings are scaled by the square root of the model dimension to adjust their magnitude,
-    which can be beneficial for training stability and convergence.
+    In Transformers, the input tokens (words, subwords, etc.) must first be converted to continuous
+    vector representations, known as embeddings, before being processed by the model. These embeddings
+    are learned during training and capture the semantic relationships between tokens. By scaling the
+    embeddings with the square root of the model dimension (`d_model`), the model ensures that the
+    variance of these embeddings remains consistent, which can stabilize training.
+
+    This class specifically handles the initial input embedding step in the Transformer, where token
+    indices are mapped to dense vectors, which are then scaled before being passed to the rest of the model.
 
     Args:
-        d_model (int): The dimension of the embedding vectors.
-        vocab_size (int): The size of the vocabulary, i.e., the number of unique tokens that can be embedded.
+        d_model (int): The dimension of the embedding vectors (i.e., the size of the continuous vector
+            that each token is mapped to).
+        vocab_size (int): The size of the vocabulary (i.e., the number of unique tokens that can be embedded).
 
     Attributes:
-        embedding (nn.Embedding): A PyTorch embedding layer that transforms token indices to dense vectors.
-
-    Methods:
-        forward(x): Computes the embedded representation of the input tokens, scaled by the square root of d_model.
+        embedding (nn.Embedding): A PyTorch embedding layer that maps token indices to dense vectors.
+        scale (float): A scaling factor equal to the square root of `d_model`, used to adjust the magnitude
+            of the embeddings.
     """
 
     def __init__(self, d_model: int, vocab_size: int):
         """
-        Initializes the InputEmbeddings module.
+        Initializes the embedding layer and computes the scaling factor for the embeddings.
+
+        The embedding layer maps token indices to dense vectors. The scaling factor ensures that the
+        embeddings are appropriately scaled in relation to the model's dimensionality. Without this scaling,
+        the magnitude of the embeddings could grow too large and lead to instability during training.
 
         Args:
             d_model (int): The dimension of the embedding vectors.
-            vocab_size (int): The number of unique tokens in the vocabulary.
+            vocab_size (int): The size of the vocabulary (number of unique tokens).
         """
         super().__init__()
-        self.d_model = d_model
-        self.vocab_size = vocab_size
-
-        # Create an embedding layer that maps vocabulary indices to dense vectors of dimension d_model
-        self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=d_model)
+        self.embedding = nn.Embedding(vocab_size, d_model)
+        self.scale = math.sqrt(d_model)
 
     def forward(self, x):
         """
-        Forward pass through the embedding layer.
+        Performs the forward pass, computing the embeddings for the input tokens and scaling them.
 
-        This method takes a batch of token indices and returns the corresponding embeddings.
-        Each embedding is scaled by the square root of d_model to ensure that the scale of the embeddings is
-        consistent with the model's expected input size.
+        Each token index in the input tensor is mapped to a dense vector via the embedding layer.
+        The resulting embeddings are then scaled by the square root of `d_model` to prevent the
+        embeddings' magnitudes from growing too large. This is critical because without scaling, the
+        variance of the embeddings would increase with `d_model`, which could destabilize the model
+        and make training slower or more difficult.
 
         Args:
             x (torch.Tensor): A tensor of shape (batch_size, sequence_length) containing token indices.
+                Each index represents a token from the vocabulary.
 
         Returns:
-            torch.Tensor: A tensor of shape (batch_size, sequence_length, d_model) containing the scaled embeddings.
+            torch.Tensor: A tensor of shape (batch_size, sequence_length, d_model) containing the scaled embeddings,
+                which are ready to be input into the subsequent layers of the Transformer model.
         """
-        # Compute the embeddings and scale them
-        return self.embedding(x) * math.sqrt(self.d_model)
+        return self.embedding(x) * self.scale
